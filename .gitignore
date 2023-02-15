@@ -1,0 +1,112 @@
+### Python
+__pycache__/
+*.pyc
+*.pickle
+
+### MCU
+mcu/Debug/
+mcu/Release/
+mcu/.settings/
+mcu/*.launch
+
+### Telecom
+telecom/gr-fsk/apps/*.py
+telecom/gr-fsk/build/
+telecom/gr-limesdr/apps/*.py
+telecom/gr-limesdr/build/
+
+### FPGA
+
+#---------------
+# db files
+#--------------
+*.ammdb
+*.bpm
+*.cdb
+*.dat
+*.ddb
+*.flock
+*.hdb
+*.hier_info
+*.hif
+*.hsd
+*.idb
+*.logdb
+*.rdb
+*.tdb
+*.wrk
+*.cmp
+*.kpt
+*.tdf
+*.db_info
+*.sci
+*.qmsg
+*.tmw_info
+*.nvd
+
+#---------------
+# Modelsim simulation
+#--------------
+*.qdb
+*.qpg
+*.qtl
+*.ini
+wlf*
+aldec/
+cadence/
+synopsys/
+
+#--------------
+#output files
+#--------------
+*.rpt
+*.done
+*.smsg
+*.summary
+*.jdi
+*.pin
+*.sld
+#--------------
+# other files
+#--------------
+#*.tcl
+ddr2_phy_autodetectedpins.tcl
+alt_sld_fab_wrapper_hw.tcl
+*.csv
+*.rpt
+!*.fit.rpt
+*.txt
+!Changelog.txt
+*.qws
+*.qarlog
+*.qar
+*.json
+*.bak
+*.html
+*.xml
+*.wlf
+*.nlv
+*.*~
+!fir_tb_gen_fir_compiler_ii_0_input.txt
+!fir_tb_gen_fir_compiler_ii_0_coef_int.txt
+!fir_tb_gen_fir_compiler_ii_0_param.txt
+
+#--------------
+# generated folders
+#--------------
+.qsys_edit/
+__pycache__/
+libraries/
+db/
+incremental_db/
+wspace_nios2/
+wspace_nios
+workspace
+source_library/
+LimeSDR-Mini_factory/src/configuration/libraries/
+
+#--------------
+# Eclipse folders
+#--------------
+**/software/.metadata/
+**/software/RemoteSystemsTempFiles/
