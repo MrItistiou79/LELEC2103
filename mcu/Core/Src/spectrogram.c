@@ -78,14 +78,19 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 	//           Number of cycles: <TODO>
 
 	q31_t vmax=0, tmp;
+	
 	uint32_t pIndex=0;
+	
 	for (int i=0; i< (uint16_t) (SAMPLES_PER_MELVEC/2); i++) {
-		tmp = ((q31_t)buf_fft[2*i]*(q31_t)buf_fft[2*i]+(q31_t)buf_fft[2*i+1]*(q31_t)buf_fft[2*i+1]);
+	
+		tmp = ( (q31_t)buf_fft[2*i] * (q31_t)buf_fft[2*i] + (q31_t)buf_fft[2*i+1] * (q31_t)buf_fft[2*i+1]);
+		
 		if (tmp>vmax){
 			vmax = tmp;
 			pIndex = i;
 		}
 	}
+	
 	vmax = sqrt(vmax);
 
 	// STEP 3.2: Normalize the vector - Dynamic range increase
