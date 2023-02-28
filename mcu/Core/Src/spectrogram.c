@@ -12,6 +12,9 @@
 #include "utils.h"
 #include "arm_absmax_q15.h"
 
+#define MAX(a, b) 	( a < b ? b : a)
+#define MIN(a, b) 	( a > b ? b : a)
+#define ABS(a)		( a > 0 ? a : -a)
 q15_t buf    [  SAMPLES_PER_MELVEC  ]; // Windowed samples
 q15_t buf_fft[2*SAMPLES_PER_MELVEC  ]; // Double size (real|imag) buffer needed for arm_rfft_q15
 q15_t buf_tmp[  SAMPLES_PER_MELVEC/2]; // Intermediate buffer for arm_mat_mult_fast_q15
@@ -77,21 +80,30 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 	//           Complexity: O(N)
 	//           Number of cycles: <TODO>
 
+
+	//-----------------------------------------------
+	// test : try to use a different method to find the max, using the estimation suggested in the hands on of the preamble detector
+	// previous : tmp = a² + b²
+
 	q31_t vmax=0, tmp;
 	
-	uint32_t pIndex=0;
+	//uint32_t pIndex=0;
+	for (int i=0; i < (uint16_t) (SAMPLES_PER_MELVEC); i++){
+		printf("%hd, ", buf_fft[i]);
+	}
+	printf("\n");
 	
 	for (int i=0; i< (uint16_t) (SAMPLES_PER_MELVEC/2); i++) {
-	
-		tmp = ( (q31_t)buf_fft[2*i] * (q31_t)buf_fft[2*i] + (q31_t)buf_fft[2*i+1] * (q31_t)buf_fft[2*i+1]);
-		
+
+		tmp = (MIN(ABS((q31_t)buf_fft[2*i]) , ABS((q31_t)buf_fft[2*i+1])) >> 4) + (MAX(ABS((q31_t)buf_fft[2*i]), ABS((q31_t)buf_fft[2*i+1])));
+
 		if (tmp>vmax){
 			vmax = tmp;
-			pIndex = i;
+		//	pIndex = i;
 		}
 	}
 	
-	vmax = sqrt(vmax);
+	//vmax = sqrt(vmax);
 
 	// STEP 3.2: Normalize the vector - Dynamic range increase
 	//           Complexity: O(N)
