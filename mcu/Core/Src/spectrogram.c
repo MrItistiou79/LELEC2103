@@ -23,27 +23,9 @@ q15_t buf_tmp[  SAMPLES_PER_MELVEC/2]; // Intermediate buffer for arm_mat_mult_f
 void Spectrogram_Format(q15_t *buf)
 {
 	// STEP 0.1 : Increase fixed-point scale
-	//            --> Pointwise shift
-	//            Complexity: O(N)
-	//            Number of cycles: <TODO>
-
-	// The output of the ADC is stored in an unsigned 12-bit format, so buf[i] is in [0 , 2**12 - 1]
-	// In order to better use the scale of the signed 16-bit format (1 bit of sign and 15 integer bits), we can multiply by 2**(15-12) = 2**3
-	// That way, the value of buf[i] is in [0 , 2**15 - 1]
-
-	// /!\ When multiplying/dividing by a power 2, always prefer shifting left/right instead, ARM instructions to do so are more efficient.
-	// Here we should shift left by 3.
-
 	arm_shift_q15(buf, 3, buf, SAMPLES_PER_MELVEC);
 
 	// STEP 0.2 : Remove DC Component
-	//            --> Pointwise substract
-	//            Complexity: O(N)
-	//            Number of cycles: <TODO>
-
-	// Since we use a signed representation, we should now center the value around zero, we can do this by substracting 2**14.
-	// Now the value of buf[i] is in [-2**14 , 2**14 - 1]
-
 	for(uint16_t i=0; i < SAMPLES_PER_MELVEC; i++) { // Remove DC component
 		buf[i] -= (1 << 14);
 	}
@@ -52,58 +34,42 @@ void Spectrogram_Format(q15_t *buf)
 // Compute spectrogram of samples and transform into MEL vectors.
 void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 {
+	// melvec = vecteur de retour dans lequel on met le résultat de la fft * melvec
+	// fft vecteur = 256
+
 	// STEP 1  : Windowing of input samples
-	//           --> Pointwise product
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
 	arm_mult_q15(samples, hamming_window, buf, SAMPLES_PER_MELVEC);
 
 	// STEP 2  : Discrete Fourier Transform
-	//           --> In-place Fast Fourier Transform (FFT) on a real signal
-	//           --> For our spectrogram, we only keep only positive frequencies (symmetry) in the next operations.
-	//           Complexity: O(Nlog(N))
-	//           Number of cycles: <TODO>
-
-	// Since the FFT is a recursive algorithm, the values are rescaled in the function to ensure that overflow cannot happen.
 	arm_rfft_instance_q15 rfft_inst;
-
 	arm_rfft_init_q15(&rfft_inst, SAMPLES_PER_MELVEC, 0, 1);
-
 	arm_rfft_q15(&rfft_inst, buf, buf_fft);
 
-	// STEP 3  : Compute the complex magnitude of the FFT
-	//           Because the FFT can output a great proportion of very small values,
-	//           we should rescale all values by their maximum to avoid loss of precision when computing the complex magnitude
-	//           In this implementation, we use integer division and multiplication to rescale values, which are very costly.
+	//computation of an estimation of the norm
+	q15_t alpha = 0.96043387;
+	q15_t beta  = 0.39782473;
 
-	// STEP 3.1: Find the extremum value (maximum of absolute values)
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
+	for (int i = 0; i < (uint16_t) (SAMPLES_PER_MELVEC/2); i++){
+		buf[i] = alpha * MAX(buf_fft[2*i], buf_fft[2*i+1]) + beta * MIN(buf_fft[2*i], buf_fft[2*i + 1]);
+	}
 
 
-	//-----------------------------------------------
-	// test : try to use a different method to find the max, using the estimation suggested in the hands on of the preamble detector
-	// previous : tmp = a² + b²
+
 
 	q31_t vmax=0, tmp;
-	
-	//uint32_t pIndex=0;
-	for (int i=0; i < (uint16_t) (SAMPLES_PER_MELVEC); i++){
-		printf("%hd, ", buf_fft[i]);
-	}
-	printf("\n");
-	
 	for (int i=0; i< (uint16_t) (SAMPLES_PER_MELVEC/2); i++) {
 
-		tmp = (MIN(ABS((q31_t)buf_fft[2*i]) , ABS((q31_t)buf_fft[2*i+1])) >> 4) + (MAX(ABS((q31_t)buf_fft[2*i]), ABS((q31_t)buf_fft[2*i+1])));
+		if ( ((q31_t) (ABS(buf_fft[2*i]) + ABS(buf_fft[2*i+1]))) > vmax) {
 
-		if (tmp>vmax){
-			vmax = tmp;
-		//	pIndex = i;
+			tmp = ((q31_t)buf_fft[2*i]*(q31_t)buf_fft[2*i]+(q31_t)buf_fft[2*i+1]*(q31_t)buf_fft[2*i+1]);
+			if (tmp>vmax){
+				vmax = tmp;
+			}
 		}
 	}
 	
-	//vmax = sqrt(vmax);
+
+	vmax = sqrt(vmax);
 
 	// STEP 3.2: Normalize the vector - Dynamic range increase
 	//           Complexity: O(N)
@@ -113,6 +79,9 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 	{
 		buf[i] = (q15_t) (((q31_t) buf_fft[i] << 15) /((q31_t)vmax));
 	}
+	// ABS max
+
+	// what would be the issue in using a q31_t buffer ? avoids normalization...
 
 	// STEP 3.3: Compute the complex magnitude
 	//           --> The output buffer is now two times smaller because (real|imag) --> (mag)
