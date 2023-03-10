@@ -69,13 +69,22 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 	// /!\ In order to avoid overflows completely the input signals should be scaled down. Scale down one of the input matrices by log2(numColsA) bits to avoid overflows,
 	// as a total of numColsA additions are computed internally for each output element. Because our hz2mel_mat matrix contains lots of zeros in its rows, this is not necessary.
 	
-	arm_matrix_instgit ance_q15 hz2mel_inst, fftmag_inst, melvec_inst;
+	arm_matrix_instance_q15 melvec_inst;
 
 	// transforms the vectors into matrix
-	arm_mat_init_q15(&hz2mel_inst, MELVEC_LENGTH, SAMPLES_PER_MELVEC/2, hz2mel_mat);
-	arm_mat_init_q15(&fftmag_inst, SAMPLES_PER_MELVEC/2, 1, buf);
 	arm_mat_init_q15(&melvec_inst, MELVEC_LENGTH, 1, melvec);
 
-	// multiplies the matrix
-	arm_mat_mult_fast_q15(&hz2mel_inst, &fftmag_inst, &melvec_inst, buf_tmp);
+
+
+	for(uint8_t i; i < 20; i++){
+		uint8_t curr 	 = *(ind + 2*i);
+		uint8_t nbr_elem = *(ind + 2*i + 1);
+
+		// computation of the ind elem of the melvec
+		for(uint8_t j; j < nbr_elem; j++){
+			melvec_inst.pData[i] += buf[curr%256 + j] * hz2mel_mat[curr + j];
+		}
+	}
+	// multipl
+	//arm_mat_mult_fast_q15(&hz2mel_inst, &fftmag_inst, &melvec_inst, buf_tmp);
 }
