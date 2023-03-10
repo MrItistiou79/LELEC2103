@@ -53,51 +53,8 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 		buf[i] = alpha * MAX(buf_fft[2*i], buf_fft[2*i+1]) + beta * MIN(buf_fft[2*i], buf_fft[2*i + 1]);
 	}
 
+	// multiply by the mel matrix
 
-
-
-	q31_t vmax=0, tmp;
-	for (int i=0; i< (uint16_t) (SAMPLES_PER_MELVEC/2); i++) {
-
-		if ( ((q31_t) (ABS(buf_fft[2*i]) + ABS(buf_fft[2*i+1]))) > vmax) {
-
-			tmp = ((q31_t)buf_fft[2*i]*(q31_t)buf_fft[2*i]+(q31_t)buf_fft[2*i+1]*(q31_t)buf_fft[2*i+1]);
-			if (tmp>vmax){
-				vmax = tmp;
-			}
-		}
-	}
-	
-
-	vmax = sqrt(vmax);
-
-	// STEP 3.2: Normalize the vector - Dynamic range increase
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
-
-	for (int i=0; i < SAMPLES_PER_MELVEC; i++) // We don't use the second half of the symmetric spectrum
-	{
-		buf[i] = (q15_t) (((q31_t) buf_fft[i] << 15) /((q31_t)vmax));
-	}
-	// ABS max
-
-	// what would be the issue in using a q31_t buffer ? avoids normalization...
-
-	// STEP 3.3: Compute the complex magnitude
-	//           --> The output buffer is now two times smaller because (real|imag) --> (mag)
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
-
-	arm_cmplx_mag_q15(buf, buf, SAMPLES_PER_MELVEC/2);
-
-	// STEP 3.4: Denormalize the vector
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
-
-	for (int i=0; i < SAMPLES_PER_MELVEC/2; i++)
-	{
-		buf[i] = (q15_t) ((((q31_t) buf[i]) * ((q31_t) vmax) ) >> 15 );
-	}
 
 	// STEP 4:   Apply MEL transform
 	//           --> Fast Matrix Multiplication
@@ -112,11 +69,13 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 	// /!\ In order to avoid overflows completely the input signals should be scaled down. Scale down one of the input matrices by log2(numColsA) bits to avoid overflows,
 	// as a total of numColsA additions are computed internally for each output element. Because our hz2mel_mat matrix contains lots of zeros in its rows, this is not necessary.
 	
-	arm_matrix_instance_q15 hz2mel_inst, fftmag_inst, melvec_inst;
+	arm_matrix_instgit ance_q15 hz2mel_inst, fftmag_inst, melvec_inst;
 
+	// transforms the vectors into matrix
 	arm_mat_init_q15(&hz2mel_inst, MELVEC_LENGTH, SAMPLES_PER_MELVEC/2, hz2mel_mat);
 	arm_mat_init_q15(&fftmag_inst, SAMPLES_PER_MELVEC/2, 1, buf);
 	arm_mat_init_q15(&melvec_inst, MELVEC_LENGTH, 1, melvec);
 
+	// multiplies the matrix
 	arm_mat_mult_fast_q15(&hz2mel_inst, &fftmag_inst, &melvec_inst, buf_tmp);
 }
