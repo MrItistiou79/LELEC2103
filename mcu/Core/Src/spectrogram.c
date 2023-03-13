@@ -34,47 +34,47 @@ void Spectrogram_Format(q15_t *buf)
 // Compute spectrogram of samples and transform into MEL vectors.
 void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 {
-	// STEP 1  : Windowing of input samples
+	// Windowing of input samples
+	arm_mult_q15(samples, hamming_window, buf, SAMPLES_PER_MELVEC);
 
-		arm_mult_q15(samples, hamming_window, buf, SAMPLES_PER_MELVEC);
+	// Discrete Fourier Transform
+	arm_rfft_instance_q15 rfft_inst;
+	arm_rfft_init_q15(&rfft_inst, SAMPLES_PER_MELVEC, 0, 1);
+	arm_rfft_q15(&rfft_inst, buf, buf_fft);
 
-		// STEP 2  : Discrete Fourier Transform
-		arm_rfft_instance_q15 rfft_inst;
-		arm_rfft_init_q15(&rfft_inst, SAMPLES_PER_MELVEC, 0, 1);
-		arm_rfft_q15(&rfft_inst, buf, buf_fft);
+	// computation of an estimation of the norm
+	q15_t alpha;
+	q15_t beta;
 
-//
-//		arm_matrix_instance_q15 hz2mel_inst, fftmag_inst, melvec_inst;
-//
-//		arm_mat_init_q15(&hz2mel_inst, MELVEC_LENGTH, SAMPLES_PER_MELVEC/2, hz2mel_mat);
-//		arm_mat_init_q15(&fftmag_inst, SAMPLES_PER_MELVEC/2, 1, buf);
-//		arm_mat_init_q15(&melvec_inst, MELVEC_LENGTH, 1, melvec);
-//
-//		arm_mat_mult_fast_q15(&hz2mel_inst, &fftmag_inst, &melvec_inst, buf_tmp);
+	float a = 0.96043;
+	float b = 0.39782;
 
-	//------------------------------------------------------
-	// new method : start
-	//------------------------------------------------------
+	arm_float_to_q15(&a, &alpha, 1);
+	arm_float_to_q15(&b, &beta, 1);
 
-	//computation of an estimation of the norm
-	for (int i = 0; i < (uint16_t) (SAMPLES_PER_MELVEC/2); i++){
-		buf[i] = (q15_t) (0.96043387 * ABS(MAX(buf_fft[2*i], buf_fft[2*i+1])) + 0.39782473 * ABS(MIN(buf_fft[2*i], buf_fft[2*i + 1])));
+	for (uint16_t i = 0; i < (uint16_t) (SAMPLES_PER_MELVEC/2); i++){
+		buf[i] = (q15_t) (alpha * (ABS(MAX(buf_fft[2*i], buf_fft[2*i+1]))) + beta * (ABS(MIN(buf_fft[2*i], buf_fft[2*i + 1]))));
 	}
 
-	arm_matrix_instance_q15 melvec_inst;
+	// matrix multiplication
+	arm_matrix_instance_q15 melvec_inst, hz2mel_inst, fftmag_inst, melvec_inst_prov;
+
+	q15_t data = 0;
 
 	//transforms the vectors into matrix
 	arm_mat_init_q15(&melvec_inst, MELVEC_LENGTH, 1, melvec);
+	arm_mat_init_q15(&melvec_inst_prov, 1, 1, &data);
 
+	for(uint8_t i = 0; i < 20; i++){
+		uint16_t curr 	 = *(ind + 2*i);		// indices at which there are non zero elements in the mel matrix
+		uint16_t nbr_elem = *(ind + 2*i + 1);	// nbr of non zero elements starting at indice curr
 
+		arm_mat_init_q15(&hz2mel_inst, 1, nbr_elem, hz2mel_mat + curr);
+		arm_mat_init_q15(&fftmag_inst, nbr_elem, 1, buf + (curr%256));
 
-	for(uint8_t i; i < 20; i++){
-		uint8_t curr 	 = *(ind + 2*i);
-		uint8_t nbr_elem = *(ind + 2*i + 1);
+		arm_mat_mult_fast_q15(&hz2mel_inst, &fftmag_inst, &melvec_inst_prov, buf_tmp);
 
-		 //computation of the ind elem of the melvec
-		for(uint8_t j; j < nbr_elem; j++){
-			melvec_inst.pData[i] += buf[curr%256 + j] * hz2mel_mat[curr + j];
-		}
+		melvec_inst.pData[i] = melvec_inst_prov.pData[0];
+		melvec_inst_prov.pData[0] = 0;
 	}
 }

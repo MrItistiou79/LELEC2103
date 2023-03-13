@@ -39,16 +39,18 @@ static void StopADCAcq() {
 
 static void print_spectrogram(void) {
 #if (DEBUGP == 1)
-	start_cycle_count();
+	//start_cycle_count();
 	DEBUG_PRINT("Acquisition complete, sending the following FVs\r\n");
 	for(unsigned int j=0; j < N_MELVECS; j++) {
 		DEBUG_PRINT("FV #%u:\t", j+1);
 		for(unsigned int i=0; i < MELVEC_LENGTH; i++) {
+			//DEBUG_PRINT("%d, ", mel_vectors[j][i]);
+
 			DEBUG_PRINT("%.2f, ", q15_to_float(mel_vectors[j][i]));
 		}
 		DEBUG_PRINT("\r\n");
 	}
-	stop_cycle_count("Print FV");
+	//stop_cycle_count("Print FV");
 #endif
 }
 
@@ -56,7 +58,7 @@ static void print_encoded_packet(uint8_t *packet) {
 #if (DEBUGP == 1)
 	char hex_encoded_packet[2*PACKET_LENGTH+1];
 	hex_encode(hex_encoded_packet, packet, PACKET_LENGTH);
-	DEBUG_PRINT("DF:HEX:%s\r\n", hex_encoded_packet);
+	//DEBUG_PRINT("DF:HEX:%s\r\n", hex_encoded_packet);
 #endif
 }
 
