@@ -8,7 +8,7 @@
 #include "packet.h"
 
 
-static volatile uint16_t ADCDoubleBuf[2*ADC_BUF_SIZE]; /* ADC group regular conversion data (array of data) */
+static volatile uint16_t ADCDoubleBuf[2*ADC_BUF_SIZE]; /* ADC group regular conversion data (array of data) */ //ADCDoubleBuf[2*ADC_BUF_SIZE] avec ADC_BUF_SIZE = SAMPLES_PER_MELVEC = 512
 static volatile uint16_t* ADCData[2] = {&ADCDoubleBuf[0], &ADCDoubleBuf[ADC_BUF_SIZE]};
 static volatile uint8_t ADCDataRdy[2] = {0, 0};
 
@@ -62,7 +62,7 @@ static void print_encoded_packet(uint8_t *packet) {
 #endif
 }
 
-static void encode_packet(uint8_t *packet, uint32_t* packet_cnt) {
+static void encode_packet(uint8_t * packet, uint32_t * packet_cnt) {
 	// BE encoding of each mel coef
 	for (size_t i=0; i<N_MELVECS; i++) {
 		for (size_t j=0; j<MELVEC_LENGTH; j++) {
@@ -80,6 +80,33 @@ static void encode_packet(uint8_t *packet, uint32_t* packet_cnt) {
 	}
 }
 
+
+
+static void send_spectrogram() {
+	uint8_t packet[PACKET_LENGTH];
+
+	//code signal energy threshold -------------------------------------------------------------------------------------- ici
+	//int sum = 0;
+	//for (size_t i=0; i<N_MELVECS; i++) {
+			//for (size_t j=0; j<MELVEC_LENGTH; j++) {
+				//sum += (mel_vectors[i][j])^2; //on additionne le carré de chaque sample de la matrice
+			//}
+	//}
+	//if (sum > 2000){
+	start_cycle_count();
+	encode_packet(packet, &packet_cnt);
+	stop_cycle_count("Encode packet");
+
+	start_cycle_count();
+	S2LP_Send(packet, PACKET_LENGTH);
+	stop_cycle_count("Send packet");
+
+	print_encoded_packet(packet);
+	//}
+}
+
+
+/*
 static void send_spectrogram() {
 	uint8_t packet[PACKET_LENGTH];
 
@@ -93,8 +120,38 @@ static void send_spectrogram() {
 
 	print_encoded_packet(packet);
 }
+*/
 
-static void ADC_Callback(int buf_cplt) {
+
+// Function for calculating /iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+int n = 2*ADC_BUF_SIZE;
+static float variance(uint16_t a[n]) { //NB : (Ne pas calculer toutle vecteur mais bien que au mileiu par ex (voir schéma Balaz)
+
+	// Compute mean (average of elements)
+	double sum = 0;
+	for (int i = 0; i < n; i++){
+		sum += a[i];
+	}
+	double mean = (double)sum / (double) n;
+
+	//compute sum squared differences with mean
+	double sqDiff = 0;
+	for (int i = 0; i<n;i++) {
+		sqDiff+= (a[i] -mean ) * (a[i] - mean);
+	return (float)sqDiff / n;
+	}
+}
+
+/*
+static void threshold_depasse(int threshold){
+	int variance = 0;
+	for (int i = 0; i<2*ADC_BUF_SIZE; i++){
+		variance +=
+	}
+}
+*/
+
+static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pendant que l'autre est traité alors on remplit l'autre pour pas perdre de temps
 	if (rem_n_bufs != -1) {
 		rem_n_bufs--;
 	}
@@ -105,25 +162,50 @@ static void ADC_Callback(int buf_cplt) {
 		Error_Handler();
 	}
 	ADCDataRdy[buf_cplt] = 1;
-	//start_cycle_count();
-	Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
-	Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
-	cur_melvec++;
-	//stop_cycle_count("spectrogram");
-	ADCDataRdy[buf_cplt] = 0;
 
-	if (rem_n_bufs == 0) {
-		print_spectrogram();
-		send_spectrogram();
+
+	if (variance(ADCData[buf_cplt]) > 700){ //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+		//start_cycle_count();
+		Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
+		Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
+
+		cur_melvec++;
+		//printf(cur_melvec);
+
+		//stop_cycle_count("spectrogram");
+		ADCDataRdy[buf_cplt] = 0;
+
+		if (rem_n_bufs == 0) {
+			print_spectrogram();
+			send_spectrogram();
+		}
+
+	} else {
+		ADCDataRdy[buf_cplt] = 0;
 	}
+
+
 }
+
+
+//extern uint8_t have_to_record; // variable qui va dire de record quand est mise à 1 et prend information
 
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
+	//sinon ici en fonction du buffer qui est rempli ADCDoubleBuf[2*ADC_BUF_SIZE]
+	//if (ADCDoubleBuf[2*ADC_BUF_SIZE] ){
+
+	//if(have_to_record){
 	ADC_Callback(1);
+		//printf("1");}
 }
 
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
 {
+	//if(have_to_record)
 	ADC_Callback(0);
+		//printf("0);}
 }
+
+
+//TOKEN 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
