@@ -94,9 +94,11 @@ static void send_spectrogram() {
 	start_cycle_count();
 	encode_packet(packet, &packet_cnt);
 	stop_cycle_count("Encode packet");
-
+	//print_encoded(packet) //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
 	start_cycle_count();
+	//S2LP_wakee??? voir la fontion!! iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiichangeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
 	S2LP_Send(packet, PACKET_LENGTH);
+	//S2LP_sleep??? voir la fontion!! iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiichangeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
 	stop_cycle_count("Send packet");
 
 	print_encoded_packet(packet);
@@ -136,8 +138,10 @@ static float variance(uint16_t a[n]) { //NB : (Ne pas calculer toutle vecteur ma
 	double sqDiff = 0;
 	for (int i = 0; i<n;i++) {
 		sqDiff+= (a[i] -mean ) * (a[i] - mean);
-	return (float)sqDiff / n;
+
 	}
+	return (float)sqDiff / n;
+
 }
 
 /*
@@ -161,8 +165,9 @@ static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pe
 	}
 	ADCDataRdy[buf_cplt] = 1;
 
-
-	if (variance(ADCData[buf_cplt]) > 700){ //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+	printf("%d \n", variance(ADCData[buf_cplt]));
+	//printf("\n");
+	if (variance(ADCData[buf_cplt]) > 8022000){ //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii 10000000 passe pas et 1000000 passe : ok for chainsaw, handsaw, helicopter,
 		//start_cycle_count();
 		Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
 		Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
@@ -171,12 +176,13 @@ static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pe
 		//printf(cur_melvec);
 
 		//stop_cycle_count("spectrogram");
-		ADCDataRdy[buf_cplt] = 0;
+		//ADCDataRdy[buf_cplt] = 0;
 
 		if (rem_n_bufs == 0) {
 			print_spectrogram();
 			send_spectrogram();
 		}
+		ADCDataRdy[buf_cplt] = 0;
 
 	} else {
 		ADCDataRdy[buf_cplt] = 0;
@@ -206,4 +212,4 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
 }
 
 
-//TOKEN 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
+//TOKEN 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
