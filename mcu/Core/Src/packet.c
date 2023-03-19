@@ -50,7 +50,7 @@ void tag_cbc_mac(uint8_t *tag, const uint8_t *msg, size_t msg_len) {
         }
         //AES128_encrypt(state, AES_Key);
         //HAL_CRYP_AESECQsB_Encrypt (CRYP_HandleTypeDef * hcryp, state, msg_len/16, state, 0xFFFF);
-        HAL_CRYP_AESECB_Encrypt(hcrypAES, state, msg_len/16, state, 0xFFFF);
+        HAL_CRYP_AESECB_Encrypt(hcrypAES, state, 16, state, 0xFFFF);
     }
     for (int j=0; j<16; j++) {
         tag[j] = state[j];

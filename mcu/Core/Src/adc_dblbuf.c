@@ -94,11 +94,14 @@ static void send_spectrogram() {
 	start_cycle_count();
 	encode_packet(packet, &packet_cnt);
 	stop_cycle_count("Encode packet");
-	//print_encoded(packet) //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+	//print_encoded(packet)
 	start_cycle_count();
-	//S2LP_wakee??? voir la fontion!! iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiichangeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+
+	// put antenna in mode sleep when not receiving or sending packet
+	S2LP_WakeUp(); // wake up the antenna iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii voir s2lp.c fonction que les tuteurs ont fait for put
 	S2LP_Send(packet, PACKET_LENGTH);
-	//S2LP_sleep??? voir la fontion!! iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiichangeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+	S2LP_Sleep(); //sleep the antenna
+
 	stop_cycle_count("Send packet");
 
 	print_encoded_packet(packet);
@@ -167,7 +170,7 @@ static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pe
 
 	printf("%d \n", variance(ADCData[buf_cplt]));
 	//printf("\n");
-	if (variance(ADCData[buf_cplt]) > 8022000){ //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii 10000000 passe pas et 1000000 passe : ok for chainsaw, handsaw, helicopter,
+	if (variance(ADCData[buf_cplt]) > 8080000){ //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii 10000000 passe pas et 1000000 passe : ok for chainsaw, handsaw, helicopter,
 		//start_cycle_count();
 		Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
 		Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
