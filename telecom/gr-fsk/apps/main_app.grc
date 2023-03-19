@@ -10,7 +10,7 @@ options:
     gen_linking: dynamic
     generate_options: qt_gui
     hier_block_src_path: '.:'
-    id: decode_sdr
+    id: decode_main
     max_nouts: '0'
     output_language: python
     placement: (0,0)
@@ -36,7 +36,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 868e6
+    value: 863.007e6
   states:
     bus_sink: false
     bus_source: false
@@ -105,7 +105,7 @@ blocks:
   id: variable
   parameters:
     comment: ''
-    value: 1e-6
+    value: '3.9e-7'
   states:
     bus_sink: false
     bus_source: false

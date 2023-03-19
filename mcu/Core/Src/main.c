@@ -1,9 +1,10 @@
 /* USER CODE BEGIN Header */
 /**
-  ******************************************************************************
+/**
+  ****************************************************************************
   * @file           : main.c
   * @brief          : Main program body
-  ******************************************************************************
+  ****************************************************************************
   * @attention
   *
   * <h2><center>&copy; Copyright (c) 2021 STMicroelectronics.
@@ -14,12 +15,13 @@
   * License. You may obtain a copy of the License at:
   *                        opensource.org/licenses/BSD-3-Clause
   *
-  ******************************************************************************
+  ****************************************************************************
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "adc.h"
+#include "aes.h"
 #include "dma.h"
 #include "spi.h"
 #include "tim.h"
@@ -62,7 +64,7 @@
 /* USER CODE BEGIN PV */
 
 volatile uint8_t btn_press;
-
+//volatile uint8_t have_to_record = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -83,12 +85,17 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 		S2LP_IRQ_Handler();
 }
 
+/*
+void HAL_ADC_LevelOutOfWindowCallback(ADC_HandleTypeDef*hadc){ //dès que signal sort threshold
+	have_to_record = 1;
+}
+*/
 static void acquire_and_send_packet() {
 	if (StartADCAcq(N_MELVECS) != HAL_OK) {
 		DEBUG_PRINT("Error while enabling the DMA\r\n");
 	}
 	while (!IsADCFinished()) {
-		__WFI();
+		__WFI(); //WFE
 	}
 }
 
@@ -108,6 +115,7 @@ void run(void)
 #if (CONTINUOUS_ACQ == 1)
 	  while (!btn_press) {
 		  acquire_and_send_packet();
+		  //have_to_record = 0; //des que fini alors se réinitiise
 	  }
 	  btn_press = 0;
 #elif (CONTINUOUS_ACQ == 0)
@@ -152,6 +160,7 @@ int main(void)
   MX_SPI1_Init();
   MX_TIM3_Init();
   MX_ADC1_Init();
+  MX_AES_Init();
   /* USER CODE BEGIN 2 */
   if (ENABLE_UART) {
 	  MX_LPUART1_UART_Init();

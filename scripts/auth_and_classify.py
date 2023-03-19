@@ -13,6 +13,10 @@ import zmq
 from classify import features, modelling
 import packet
 
+import requests
+import json
+
+
 # For plotting only
 MELVEC_MIN = 0.0
 MELVEC_MAX = 1.0
@@ -161,6 +165,21 @@ if __name__ == '__main__':
         if args.classifier:
             sound_class = model.eval(melvecs)
             print("Sound class:", sound_class)
+
+            hostname = "https://perceval.elen.ucl.ac.be/lelec2103"
+            key = "TFtdRyyXrrkGGrzECz5e-viHzmfFYSNLV5JC5rSV"
+            listguess = ["fire","birds","helicopter","chainsaw","handsaw"]
+            guess = listguess[int(sound_class)]
+            #guess = "fire"
+            #guess = str(sound_class)
+
+            response = requests.patch(f"{hostname}/leaderboard/submit/{key}/{guess}")
+
+
+            # All responses are JSON dictionaries
+            response_as_dict = json.loads(response.text)
+
+
 
         if args.display:
             try:
