@@ -83,33 +83,6 @@ static void encode_packet(uint8_t * packet, uint32_t * packet_cnt) {
 static void send_spectrogram() {
 	uint8_t packet[PACKET_LENGTH];
 
-	//code signal energy threshold -------------------------------------------------------------------------------------- ici
-	//int sum = 0;
-	//for (size_t i=0; i<N_MELVECS; i++) {
-			//for (size_t j=0; j<MELVEC_LENGTH; j++) {
-				//sum += (mel_vectors[i][j])^2; //on additionne le carré de chaque sample de la matrice
-			//}
-	//}
-	//if (sum > 2000){
-	start_cycle_count();
-	encode_packet(packet, &packet_cnt);
-	stop_cycle_count("Encode packet");
-	//print_encoded(packet) //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
-	start_cycle_count();
-	//S2LP_wakee??? voir la fontion!! iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiichangeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-	S2LP_Send(packet, PACKET_LENGTH);
-	//S2LP_sleep??? voir la fontion!! iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiichangeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-	stop_cycle_count("Send packet");
-
-	print_encoded_packet(packet);
-	//}
-}
-
-
-/*
-static void send_spectrogram() {
-	uint8_t packet[PACKET_LENGTH];
-
 	start_cycle_count();
 	encode_packet(packet, &packet_cnt);
 	stop_cycle_count("Encode packet");
@@ -119,75 +92,53 @@ static void send_spectrogram() {
 	stop_cycle_count("Send packet");
 
 	print_encoded_packet(packet);
-}
-*/
-
-
-// Function for calculating /iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
-int n = 2*ADC_BUF_SIZE;
-static float variance(uint16_t a[n]) { //NB : (Ne pas calculer toutle vecteur mais bien que au mileiu par ex (voir schéma Balaz)
-
-	// Compute mean (average of elements)
-	double sum = 0;
-	for (int i = 0; i < n; i++){
-		sum += a[i];
-	}
-	double mean = (double)sum / (double) n;
-
-	//compute sum squared differences with mean
-	double sqDiff = 0;
-	for (int i = 0; i<n;i++) {
-		sqDiff+= (a[i] -mean ) * (a[i] - mean);
-
-	}
-	return (float)sqDiff / n;
 
 }
 
-/*
-static void threshold_depasse(int threshold){
-	int variance = 0;
-	for (int i = 0; i<2*ADC_BUF_SIZE; i++){
-		variance +=
-	}
-}
-*/
+
 
 static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pendant que l'autre est traité alors on remplit l'autre pour pas perdre de temps
+
+
 	if (rem_n_bufs != -1) {
 		rem_n_bufs--;
 	}
+
 	if (rem_n_bufs == 0) {
 		StopADCAcq();
 	} else if (ADCDataRdy[1-buf_cplt]) {
 		DEBUG_PRINT("Error: ADC Data buffer full\r\n");
 		Error_Handler();
 	}
-	ADCDataRdy[buf_cplt] = 1;
 
-	printf("%d \n", variance(ADCData[buf_cplt]));
-	//printf("\n");
-	if (variance(ADCData[buf_cplt]) > 8022000){ //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii 10000000 passe pas et 1000000 passe : ok for chainsaw, handsaw, helicopter,
+	ADCDataRdy[buf_cplt] = 1;
+	q15_t var;
+
+	arm_var_q15(ADCData[buf_cplt], ADC_BUF_SIZE, &var); // 2* adc buf size ? et calculer sur tout le vecteur ?
+
+	//printf("var = %f\n\r", var);
+
+	if (var > 0){
+
 		//start_cycle_count();
 		Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
 		Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
 
 		cur_melvec++;
-		//printf(cur_melvec);
 
 		//stop_cycle_count("spectrogram");
-		//ADCDataRdy[buf_cplt] = 0;
+		ADCDataRdy[buf_cplt] = 0;
 
 		if (rem_n_bufs == 0) {
 			print_spectrogram();
 			send_spectrogram();
 		}
-		ADCDataRdy[buf_cplt] = 0;
+		//ADCDataRdy[buf_cplt] = 0;
 
 	} else {
 		ADCDataRdy[buf_cplt] = 0;
 	}
-
+	var = 0; // à checker pr être sûr qu'il faut faire ça
 
 }
 

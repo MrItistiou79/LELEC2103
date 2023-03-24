@@ -100,9 +100,14 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 #include "utils.h"
 #include "arm_absmax_q15.h"
 
+#define MAX(a, b) 	( a < b ? b : a)
+#define MIN(a, b) 	( a > b ? b : a)
+#define ABS(a)		( a > 0 ? a : -a)
 q15_t buf    [  SAMPLES_PER_MELVEC  ]; // Windowed samples
 q15_t buf_fft[2*SAMPLES_PER_MELVEC  ]; // Double size (real|imag) buffer needed for arm_rfft_q15
 q15_t buf_tmp[  SAMPLES_PER_MELVEC/2]; // Intermediate buffer for arm_mat_mult_fast_q15
+q15_t buf_comp[ SAMPLES_PER_MELVEC/2];
+q31_t buf_temp[  SAMPLES_PER_MELVEC  ];
 
 // Convert 12-bit DC ADC samples to Q1.15 fixed point signal and remove DC component
 void Spectrogram_Format(q15_t *buf)
@@ -138,33 +143,60 @@ void Spectrogram_Format(q15_t *buf)
 void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 {
 	// STEP 1  : Windowing of input samples
-	//           --> Pointwise product
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
 	arm_mult_q15(samples, hamming_window, buf, SAMPLES_PER_MELVEC);
 
 	// STEP 2  : Discrete Fourier Transform
-	//           --> In-place Fast Fourier Transform (FFT) on a real signal
-	//           --> For our spectrogram, we only keep only positive frequencies (symmetry) in the next operations.
-	//           Complexity: O(Nlog(N))
-	//           Number of cycles: <TODO>
-
-	// Since the FFT is a recursive algorithm, the values are rescaled in the function to ensure that overflow cannot happen.
 	arm_rfft_instance_q15 rfft_inst;
-
 	arm_rfft_init_q15(&rfft_inst, SAMPLES_PER_MELVEC, 0, 1);
-
 	arm_rfft_q15(&rfft_inst, buf, buf_fft);
 
+
+	// STEP 3 : norm computation
+
+	// conversion to Q31
+	start_cycle_count();
+	arm_q15_to_q31(buf_fft, buf_temp, 2*SAMPLES_PER_MELVEC);
+	arm_cmplx_mag_q31(buf_temp, buf_temp, SAMPLES_PER_MELVEC/2);
+	stop_cycle_count("Conversion to q31");
+
+	// arm_max_q15(const q15_t * pSrc, uint32_t blockSize, q15_t * pResult,	uint32_t * pIndex);
+
+
+
+	// computation of an estimation of the norm
+	q15_t alpha;
+	q15_t beta;
+	arm_cmplx_mag_q15(buf, buf, SAMPLES_PER_MELVEC/2);
+
+	float a = 0.96043;
+	float b = 0.39782;
+
+	arm_float_to_q15(&a, &alpha, 1);
+	arm_float_to_q15(&b, &beta, 1);
+
+	for (uint16_t i = 0; i < (uint16_t) (SAMPLES_PER_MELVEC/2); i++){
+		q15_t a1 = buf_fft[2*i];
+		q15_t b1 = buf_fft[2*i+1];
+
+		//buf[i] = (q15_t) (alpha * (ABS(MAX(buf_fft[2*i], buf_fft[2*i+1]))) + beta * (ABS(MIN(buf_fft[2*i], buf_fft[2*i + 1]))));
+
+		buf[i] = (q15_t) ((q31_t)a1 *(q31_t)a1 + (q31_t)b1 * (q31_t)b1);// --> fonctionne
+
+	}
+
+/**
 	// STEP 3  : Compute the complex magnitude of the FFT
-	//           Because the FFT can output a great proportion of very small values,
-	//           we should rescale all values by their maximum to avoid loss of precision when computing the complex magnitude
-	//           In this implementation, we use integer division and multiplication to rescale values, which are very costly.
 
 	// STEP 3.1: Find the extremum value (maximum of absolute values)
 	//           Complexity: O(N)
 	//           Number of cycles: <TODO>
 
+
+//q15_t a1 = buf_fft[2*i];
+		//q15_t b1 = buf_fft[2*i+1];
+		buf_comp[i] = (q15_t) 32000;
+		//buf[i] = (q15_t) 0;
+		 *
 	q31_t vmax=0, tmp;
 	uint32_t pIndex=0;
 	for (int i=0; i< (uint16_t) (SAMPLES_PER_MELVEC/2); i++) {
@@ -199,7 +231,7 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 	for (int i=0; i < SAMPLES_PER_MELVEC/2; i++)
 	{
 		buf[i] = (q15_t) ((((q31_t) buf[i]) * ((q31_t) vmax) ) >> 15 );
-	}
+	}**/
 
 	// STEP 4:   Apply MEL transform
 	//           --> Fast Matrix Multiplication
@@ -213,6 +245,8 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 
 	// /!\ In order to avoid overflows completely the input signals should be scaled down. Scale down one of the input matrices by log2(numColsA) bits to avoid overflows,
 	// as a total of numColsA additions are computed internally for each output element. Because our hz2mel_mat matrix contains lots of zeros in its rows, this is not necessary.
+
+
 
 	arm_matrix_instance_q15 hz2mel_inst, fftmag_inst, melvec_inst;
 
