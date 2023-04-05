@@ -9,53 +9,85 @@
 #include "utils.h"
 #include "aes.h"
 
-CRYP_HandleTypeDef *hcrypAES; //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+extern CRYP_HandleTypeDef hcryp; //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
 
 
-const uint8_t AES_Key[16]  = {
-                            0x01,0x02,0x03,0x04,
-							0x05,0x06,0x07,0x08,
-							0x09,0x0A,0x0B,0x0C,
-							0x0D,0x0E,0x0F,0x00};
+const uint8_t AES_Key[16]  = {0x00,0x00,0x00,0x00,
+							0x00,0x00,0x00,0x00,
+							0x00,0x00,0x00, 0x00,
+							0x00, 0x00, 0x00, 0x00};
 
-void tag_cbc_mac(uint8_t *tag, const uint8_t *msg, size_t msg_len) {
+
+
+
+void tag_cbc_mac(uint8_t *tag, uint8_t *msg, size_t msg_len){
+	//uint32_t statew[4] = {0};
+	//uint8_t *state = (uint8_t*) statew;
 	uint32_t statew[4] = {0};
 	uint8_t *state = (uint8_t*) statew;
 
-    size_t i;
-    for (i=0; i < msg_len/16; i++) {
-        for (int j=0; j<16; j++) {
-            state[j] ^= msg[16*i+j];
-        }
-        //AES128_encrypt(state, AES_Key);
-        // mettre fonction qui encrypt p.193
-        // AL_StatusTypeDef HAL_CRYP_AESECB_Encrypt (CRYP_HandleTypeDef * hcryp, uint8_t * pPlainData, uint16_t Size, uint8_t * pCypherData, uint32_t Timeout)
-        // state est un buffer qui va prendre le msg le transformer et le resortir mixé
-        HAL_CRYP_AESECB_Encrypt(hcrypAES, state, msg_len/16, state, 0xFFFF);
+	size_t i;
+	for (i=0; i < msg_len/16; i++) {
+		for (int j=0; j<16; j++) {
+			state[j] ^= msg[16*i+j];
+		}
+		//AES128_encrypt(state, AES_Key);
+		// mettre fonction qui encrypt p.193
+		// AL_StatusTypeDef HAL_CRYP_AESECB_Encrypt (CRYP_HandleTypeDef * hcryp, uint8_t * pPlainData, uint16_t Size, uint8_t * pCypherData, uint32_t Timeout)
+		// state est un buffer qui va prendre le msg le transformer et le resortir mixé
+		HAL_CRYP_AESECB_Encrypt(&hcryp, state, 16, state, 0xFFFF);
 
-        /*
-         * Parameters
+		/*
+		 * Parameters
 		• hcryp: pointer to a CRYP_HandleTypeDef structure that contains the configuration information for CRYP
 		module
 		• pPlainData: Pointer to the plaintext buffer
 		• Size: Length of the plaintext buffer in bytes, must be a multiple of 16.
 		• pCypherData: Pointer to the cyphertext buffer
 		• Timeout: Specify Timeout value
-         *
-         */
-    }
-    if (16*i != msg_len) {
-        for (int j=0; j<msg_len-16*i; j++) {
-            state[j] ^= msg[16*i+j];
-        }
-        //AES128_encrypt(state, AES_Key);
-        //HAL_CRYP_AESECQsB_Encrypt (CRYP_HandleTypeDef * hcryp, state, msg_len/16, state, 0xFFFF);
-        HAL_CRYP_AESECB_Encrypt(hcrypAES, state, 16, state, 0xFFFF);
-    }
+		 *
+		 */
+	}
+	if (16*i != msg_len) {
+		for (int j=0; j<msg_len-16*i; j++) {
+			state[j] ^= msg[16*i+j];
+		}
+		//AES128_encrypt(state, AES_Key);
+		//HAL_CRYP_AESECQsB_Encrypt (CRYP_HandleTypeDef * hcryp, state, msg_len/16, state, 0xFFFF);
+		HAL_CRYP_AESECB_Encrypt(&hcryp, state, 16, state, 0xFFFF);
+	}
+	for (int j=0; j<16; j++) {
+		tag[j] = state[j];
+	}
+}
+
+
+/**
+	uint8_t encrypt[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
+	for (int i = 0; i < msg_len; i++){
+		printf("%u, ", *(msg+i));
+
+	}
+	printf("\n\r---------\n\r");
+    HAL_CRYP_Init(&hcrypAES); //???????????????????????????????????????????????????????????????????
+
+
+    HAL_CRYP_AESCBC_Encrypt(&hcrypAES, msg, 16, encrypt, 0xFFFF);
+	for (int i = 0; i < msg_len; i++){
+		printf("%u, ", *(msg+i));
+	}
+	printf("\n\r---------\n\r");
+
+	for (int i = 0; i < 16; i++){
+		printf("%u, ", *(encrypt+i));
+	}
+	printf("\n\r");
     for (int j=0; j<16; j++) {
-        tag[j] = state[j];
+        tag[j] = encrypt[j];
     }
 }
+**/
+
 /*
 Function name
 HAL_StatusTypeDef HAL_CRYP_AESECB_Encrypt (CRYP_HandleTypeDef * hcryp, uint8_t * pPlainData,

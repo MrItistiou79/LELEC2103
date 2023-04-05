@@ -83,114 +83,98 @@ static void encode_packet(uint8_t * packet, uint32_t * packet_cnt) {
 static void send_spectrogram() {
 	uint8_t packet[PACKET_LENGTH];
 
-	//code signal energy threshold -------------------------------------------------------------------------------------- ici
-	//int sum = 0;
-	//for (size_t i=0; i<N_MELVECS; i++) {
-			//for (size_t j=0; j<MELVEC_LENGTH; j++) {
-				//sum += (mel_vectors[i][j])^2; //on additionne le carré de chaque sample de la matrice
-			//}
-	//}
-	//if (sum > 2000){
 	start_cycle_count();
 	encode_packet(packet, &packet_cnt);
 	stop_cycle_count("Encode packet");
-	//print_encoded(packet)
-	start_cycle_count();
 
-	// put antenna in mode sleep when not receiving or sending packet
+	//start_cycle_count();
 	S2LP_WakeUp(); // wake up the antenna iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii voir s2lp.c fonction que les tuteurs ont fait for put
 	S2LP_Send(packet, PACKET_LENGTH);
-	S2LP_Sleep(); //sleep the antenna
+	//S2LP_Sleep(); //sleep the antenna
 
-	stop_cycle_count("Send packet");
-
-	print_encoded_packet(packet);
-	//}
-}
-
-
-/*
-static void send_spectrogram() {
-	uint8_t packet[PACKET_LENGTH];
-
-	start_cycle_count();
-	encode_packet(packet, &packet_cnt);
-	stop_cycle_count("Encode packet");
-
-	start_cycle_count();
 	S2LP_Send(packet, PACKET_LENGTH);
 	stop_cycle_count("Send packet");
 
 	print_encoded_packet(packet);
-}
-*/
-
-
-// Function for calculating /iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
-int n = 2*ADC_BUF_SIZE;
-static float variance(uint16_t a[n]) { //NB : (Ne pas calculer toutle vecteur mais bien que au mileiu par ex (voir schéma Balaz)
-
-	// Compute mean (average of elements)
-	double sum = 0;
-	for (int i = 0; i < n; i++){
-		sum += a[i];
-	}
-	double mean = (double)sum / (double) n;
-
-	//compute sum squared differences with mean
-	double sqDiff = 0;
-	for (int i = 0; i<n;i++) {
-		sqDiff+= (a[i] -mean ) * (a[i] - mean);
-
-	}
-	return (float)sqDiff / n;
 
 }
 
-/*
-static void threshold_depasse(int threshold){
-	int variance = 0;
-	for (int i = 0; i<2*ADC_BUF_SIZE; i++){
-		variance +=
-	}
+
+// -------------------------------------------THRESHOLD DYNAMIQUE -------------------------------------iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+int c = 0;
+q15_t buf_var[10];
+
+static void dynamic_treshold(q15_t variance) {
+	int index = c%10;
+	buf_var[index] = variance;
+	c+=1;
+
 }
-*/
+
+
+q15_t mean_q15(q15_t* arr, int len) {
+	int32_t sum = 0;
+	for (int i = 0; i < len; i++) {
+		sum += arr[i];
+	}
+	return (q15_t)(sum / len);
+}
+
+
 
 static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pendant que l'autre est traité alors on remplit l'autre pour pas perdre de temps
+
+
 	if (rem_n_bufs != -1) {
 		rem_n_bufs--;
 	}
+
 	if (rem_n_bufs == 0) {
 		StopADCAcq();
 	} else if (ADCDataRdy[1-buf_cplt]) {
 		DEBUG_PRINT("Error: ADC Data buffer full\r\n");
 		Error_Handler();
 	}
+
 	ADCDataRdy[buf_cplt] = 1;
+	q15_t var;
 
-	printf("%d \n", variance(ADCData[buf_cplt]));
-	//printf("\n");
-	if (variance(ADCData[buf_cplt]) > 8080000){ //iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii 10000000 passe pas et 1000000 passe : ok for chainsaw, handsaw, helicopter,
-		//start_cycle_count();
-		Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
-		Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
+	arm_var_q15(ADCData[buf_cplt], ADC_BUF_SIZE, &var); // 2* adc buf size ? et calculer sur tout le vecteur ?
+	//printf("var avant = %d\n\r", (int)var);
 
-		cur_melvec++;
-		//printf(cur_melvec);
+	//if (var > 0){
+	//printf("threshold var = %d\n\r", (int)var);
 
-		//stop_cycle_count("spectrogram");
-		//ADCDataRdy[buf_cplt] = 0;
 
-		if (rem_n_bufs == 0) {
-			print_spectrogram();
-			send_spectrogram();
+	q15_t threshold_actuel = var;
+	dynamic_treshold(var); //complete buf_var with value of var
+
+	if (c>9) {
+		q15_t moyenne_var = mean_q15(buf_var, 10);
+		printf("moyenn_var = %d\n\r", (int) moyenne_var);
+		//if (1.1*moyenne_var > threshold_actuel) {
+		if (1.1*moyenne_var < threshold_actuel & (int)var > 0.5) { //si moyenne des 10 derniers variances est plus grand que threshold actuel //(int)var > 2
+			printf("threshold_actuel = %d\n\r", (int) threshold_actuel);
+			//start_cycle_count();
+			Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
+			Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
+
+			cur_melvec++;
+
+			//stop_cycle_count("spectrogram");
+			ADCDataRdy[buf_cplt] = 0;
+
+			if (rem_n_bufs == 0) {
+				print_spectrogram();
+				send_spectrogram();
+			}
 		}
-		ADCDataRdy[buf_cplt] = 0;
+	ADCDataRdy[buf_cplt] = 0;
 
 	} else {
 		ADCDataRdy[buf_cplt] = 0;
 	}
-
+	//var = 0; // à checker pr être sûr qu'il faut faire ça
 
 }
 
@@ -213,6 +197,5 @@ void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
 	ADC_Callback(0);
 		//printf("0);}
 }
-
 
 //TOKEN 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

@@ -180,6 +180,17 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 	//           Complexity: O(N)
 	//           Number of cycles: <TODO>
 
+
+	/**
+	arm_mat_scale_q15(buf_fft, , 15, buf);
+
+	for (int i=0; i < SAMPLES_PER_MELVEC; i++) // We don't use the second half of the symmetric spectrum
+	{
+		//buf[i] = (q15_t) (((q31_t) buf_fft[i] << 15) /((q31_t)vmax));
+		buf[i] = buf[i]/(q31_t)vmax;
+	}
+	**/
+
 	for (int i=0; i < SAMPLES_PER_MELVEC; i++) // We don't use the second half of the symmetric spectrum
 	{
 		buf[i] = (q15_t) (((q31_t) buf_fft[i] << 15) /((q31_t)vmax));

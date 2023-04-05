@@ -2674,6 +2674,9 @@ arm_status arm_mat_scale_f32(
    * @return     The function returns either
    * <code>ARM_MATH_SIZE_MISMATCH</code> or <code>ARM_MATH_SUCCESS</code> based on the outcome of size checking.
    */
+
+
+//iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
 arm_status arm_mat_scale_q15(
   const arm_matrix_instance_q15 * pSrc,
         q15_t scaleFract,
@@ -3674,7 +3677,7 @@ arm_status arm_rfft_fast_init_f32 (
 
 
   /**
-   * @brief Q15 vector absolute value.
+   * @brief Q15 vector absolute value. // iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
    * @param[in]  pSrc       points to the input buffer
    * @param[out] pDst       points to the output buffer
    * @param[in]  blockSize  number of samples in each vector
@@ -3754,7 +3757,6 @@ arm_status arm_rfft_fast_init_f32 (
 
 
   /**
-   * @brief  Shifts the elements of a Q7 vector a specified number of bits.
    * @param[in]  pSrc       points to the input vector
    * @param[in]  shiftBits  number of bits to shift.  A positive value shifts left; a negative value shifts right.
    * @param[out] pDst       points to the output vector

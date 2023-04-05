@@ -308,7 +308,7 @@ int Decrypt(word8 a[4][MAXBC], word8 rk[MAXROUNDS + 1][4][MAXBC]) {
   AddRoundKey(a, rk[0]);
   return 0;
 }
-/*
+
 void AES128_encrypt(word8* block, const word8* key) {
   word8 a[4][MAXBC], rk[MAXROUNDS + 1][4][MAXBC], sk[4][MAXKC];
   for (int j=0; j<4; j++) {
@@ -325,4 +325,4 @@ void AES128_encrypt(word8* block, const word8* key) {
       }
   }
 }
-*/
+

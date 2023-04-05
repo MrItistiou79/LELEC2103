@@ -15,7 +15,7 @@
 #define PAYLOAD_LENGTH (sizeof(q15_t) * N_MELVECS * MELVEC_LENGTH)
 #define PACKET_LENGTH (PACKET_HEADER_LENGTH + PAYLOAD_LENGTH + PACKET_TAG_LENGTH)
 
-void tag_cbc_mac(uint8_t *tag, const uint8_t *msg, size_t msg_len);
+void tag_cbc_mac(uint8_t *tag, uint8_t *msg, size_t msg_len);
 
 int make_packet(uint8_t *packet, size_t payload_len, uint8_t sender_id, uint32_t serial);
 

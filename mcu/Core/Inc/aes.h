@@ -28,7 +28,7 @@ extern "C" {
 #include "main.h"
 
 /* USER CODE BEGIN Includes */
-extern CRYP_HandleTypeDef *hcrypAES; //pour HAL_CRYPT AES
+
 /* USER CODE END Includes */
 
 extern CRYP_HandleTypeDef hcryp;
