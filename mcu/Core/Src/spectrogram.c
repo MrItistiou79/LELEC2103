@@ -100,6 +100,10 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 #include "utils.h"
 #include "arm_absmax_q15.h"
 
+#define MAX(a, b) ( a < b ? b : a)
+#define MIN(a, b) ( a > b ? b : a)
+#define ABS(a) ( a > 0 ? a : -a)
+
 q15_t buf    [  SAMPLES_PER_MELVEC  ]; // Windowed samples
 q15_t buf_fft[2*SAMPLES_PER_MELVEC  ]; // Double size (real|imag) buffer needed for arm_rfft_q15
 q15_t buf_tmp[  SAMPLES_PER_MELVEC/2]; // Intermediate buffer for arm_mat_mult_fast_q15
@@ -156,60 +160,22 @@ void Spectrogram_Compute(q15_t *samples, q15_t *melvec)
 
 	arm_rfft_q15(&rfft_inst, buf, buf_fft);
 
-	// STEP 3  : Compute the complex magnitude of the FFT
-	//           Because the FFT can output a great proportion of very small values,
-	//           we should rescale all values by their maximum to avoid loss of precision when computing the complex magnitude
-	//           In this implementation, we use integer division and multiplication to rescale values, which are very costly.
 
-	// STEP 3.1: Find the extremum value (maximum of absolute values)
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
-
-	q31_t vmax=0, tmp;
-	uint32_t pIndex=0;
-	for (int i=0; i< (uint16_t) (SAMPLES_PER_MELVEC/2); i++) {
-		tmp = ((q31_t)buf_fft[2*i]*(q31_t)buf_fft[2*i]+(q31_t)buf_fft[2*i+1]*(q31_t)buf_fft[2*i+1]);
-		if (tmp>vmax){
-			vmax = tmp;
-			pIndex = i;
-		}
-	}
-	vmax = sqrt(vmax);
-
-	// STEP 3.2: Normalize the vector - Dynamic range increase
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
-
-
-	/**
-	arm_mat_scale_q15(buf_fft, , 15, buf);
-
-	for (int i=0; i < SAMPLES_PER_MELVEC; i++) // We don't use the second half of the symmetric spectrum
-	{
-		//buf[i] = (q15_t) (((q31_t) buf_fft[i] << 15) /((q31_t)vmax));
-		buf[i] = buf[i]/(q31_t)vmax;
-	}
-	**/
-
-	for (int i=0; i < SAMPLES_PER_MELVEC; i++) // We don't use the second half of the symmetric spectrum
-	{
-		buf[i] = (q15_t) (((q31_t) buf_fft[i] << 15) /((q31_t)vmax));
-	}
-
-	// STEP 3.3: Compute the complex magnitude
-	//           --> The output buffer is now two times smaller because (real|imag) --> (mag)
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
-
+	// computation of an estimation of the norm
+	q15_t alpha = 31476;
+	q15_t beta = 13036;
 	arm_cmplx_mag_q15(buf, buf, SAMPLES_PER_MELVEC/2);
 
-	// STEP 3.4: Denormalize the vector
-	//           Complexity: O(N)
-	//           Number of cycles: <TODO>
+	//float a = 0.96043;
+	//float b = 0.39782;
+	//arm_float_to_q15(&a, &alpha, 1);
+	//printf("alpha = %d\n\r", alpha);
+	//printf("%d : alpha = ", int(alpha));
+	//arm_float_to_q15(&b, &beta, 1);
+	//printf("beta = %d\n\r", beta);
 
-	for (int i=0; i < SAMPLES_PER_MELVEC/2; i++)
-	{
-		buf[i] = (q15_t) ((((q31_t) buf[i]) * ((q31_t) vmax) ) >> 15 );
+	for (uint16_t i = 0; i < (uint16_t) (SAMPLES_PER_MELVEC/2); i++){
+		buf[i] = (q15_t) (alpha * (ABS(MAX(buf_fft[2*i], buf_fft[2*i+1]))) + beta * (ABS(MIN(buf_fft[2*i], buf_fft[2*i + 1]))));
 	}
 
 	// STEP 4:   Apply MEL transform

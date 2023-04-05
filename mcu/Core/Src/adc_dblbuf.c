@@ -87,10 +87,10 @@ static void send_spectrogram() {
 	encode_packet(packet, &packet_cnt);
 	stop_cycle_count("Encode packet");
 
-	//start_cycle_count();
+	start_cycle_count();
 	S2LP_WakeUp(); // wake up the antenna iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii voir s2lp.c fonction que les tuteurs ont fait for put
 	S2LP_Send(packet, PACKET_LENGTH);
-	//S2LP_Sleep(); //sleep the antenna
+	S2LP_Sleep(); //sleep the antenna
 
 	S2LP_Send(packet, PACKET_LENGTH);
 	stop_cycle_count("Send packet");
@@ -111,7 +111,7 @@ static void dynamic_treshold(q15_t variance) {
 
 }
 
-
+/* NOT USEFUL ANYMORE we use arm_mean instead
 q15_t mean_q15(q15_t* arr, int len) {
 	int32_t sum = 0;
 	for (int i = 0; i < len; i++) {
@@ -119,7 +119,7 @@ q15_t mean_q15(q15_t* arr, int len) {
 	}
 	return (q15_t)(sum / len);
 }
-
+*/
 
 
 static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pendant que l'autre est traité alors on remplit l'autre pour pas perdre de temps
@@ -142,18 +142,15 @@ static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pe
 	arm_var_q15(ADCData[buf_cplt], ADC_BUF_SIZE, &var); // 2* adc buf size ? et calculer sur tout le vecteur ?
 	//printf("var avant = %d\n\r", (int)var);
 
-	//if (var > 0){
-	//printf("threshold var = %d\n\r", (int)var);
-
-
 	q15_t threshold_actuel = var;
 	dynamic_treshold(var); //complete buf_var with value of var
 
+	q15_t mean_var;
 	if (c>9) {
-		q15_t moyenne_var = mean_q15(buf_var, 10);
-		printf("moyenn_var = %d\n\r", (int) moyenne_var);
-		//if (1.1*moyenne_var > threshold_actuel) {
-		if (1.1*moyenne_var < threshold_actuel & (int)var > 0.5) { //si moyenne des 10 derniers variances est plus grand que threshold actuel //(int)var > 2
+		arm_mean_q15(buf_var, 10, &mean_var);
+		//printf("mean_var = %d\n\r", pResult);
+
+		if (1.1*mean_var < threshold_actuel || (int)var > 0.5) { //si moyenne des 10 derniers variances est plus grand que threshold actuel //(int)var > 2
 			printf("threshold_actuel = %d\n\r", (int) threshold_actuel);
 			//start_cycle_count();
 			Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
