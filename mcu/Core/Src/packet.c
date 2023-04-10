@@ -36,9 +36,11 @@ void tag_cbc_mac(uint8_t *tag, uint8_t *msg, size_t msg_len){
 		// AL_StatusTypeDef HAL_CRYP_AESECB_Encrypt (CRYP_HandleTypeDef * hcryp, uint8_t * pPlainData, uint16_t Size, uint8_t * pCypherData, uint32_t Timeout)
 		// state est un buffer qui va prendre le msg le transformer et le resortir mixé
 		//printf("AES Encrypt cycles");
-		//start_cycle_count(); ça bug qd on fait ça !!
+
+		//start_cycle_count(); //ça bug qd on fait ça !!
 		HAL_CRYP_AESECB_Encrypt(&hcryp, state, 16, state, 0xFFFF);
 		//stop_cycle_count("AES encrypt cycles");
+
 		/*
 		 * Parameters
 		• hcryp: pointer to a CRYP_HandleTypeDef structure that contains the configuration information for CRYP

@@ -28,6 +28,6 @@ static inline q15_t float_to_q15(float x)
 void Spectrogram_Format(q15_t *buf);
 
 // Compute spectrogram of samples into melvec. Modifies samples.
-void Spectrogram_Compute(q15_t *samples, q15_t *melvector);
+void Spectrogram_Compute(q15_t *samples, q15_t *spec_vec);
 
 #endif /* INC_SPECTROGRAM_H_ */

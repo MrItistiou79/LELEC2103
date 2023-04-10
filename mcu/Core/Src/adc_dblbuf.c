@@ -12,8 +12,9 @@ static volatile uint16_t ADCDoubleBuf[2*ADC_BUF_SIZE]; /* ADC group regular conv
 static volatile uint16_t* ADCData[2] = {&ADCDoubleBuf[0], &ADCDoubleBuf[ADC_BUF_SIZE]};
 static volatile uint8_t ADCDataRdy[2] = {0, 0};
 
-static volatile uint8_t cur_melvec = 0;
-static q15_t mel_vectors[N_MELVECS][MELVEC_LENGTH];
+static volatile uint8_t cur_spec_vec = 0;
+//static q15_t mel_vectors[N_MELVECS][MELVEC_LENGTH];
+static q15_t spec_vec[N_MELVECS][SAMPLES_PER_MELVEC/2];
 
 static uint32_t packet_cnt = 0;
 
@@ -21,7 +22,7 @@ static volatile int32_t rem_n_bufs = 0;
 
 int StartADCAcq(int32_t n_bufs) {
 	rem_n_bufs = n_bufs;
-	cur_melvec = 0;
+	cur_spec_vec = 0;
 	if (rem_n_bufs != 0) {
 		return HAL_ADC_Start_DMA(&hadc1, (uint32_t *)ADCDoubleBuf, 2*ADC_BUF_SIZE);
 	} else {
@@ -30,6 +31,7 @@ int StartADCAcq(int32_t n_bufs) {
 }
 
 int IsADCFinished(void) {
+	//printf("IsADCfinished\n\r");
 	return (rem_n_bufs == 0);
 }
 
@@ -37,9 +39,10 @@ static void StopADCAcq() {
 	HAL_ADC_Stop_DMA(&hadc1);
 }
 
+/*
 static void print_spectrogram(void) {
 #if (DEBUGP == 1)
-	start_cycle_count();
+	//start_cycle_count();
 	DEBUG_PRINT("Acquisition complete, sending the following FVs\r\n");
 	for(unsigned int j=0; j < N_MELVECS; j++) {
 		DEBUG_PRINT("FV #%u:\t", j+1);
@@ -48,9 +51,29 @@ static void print_spectrogram(void) {
 		}
 		DEBUG_PRINT("\r\n");
 	}
-	stop_cycle_count("Print FV");
+	//stop_cycle_count("Print FV");
 #endif
 }
+*/
+
+
+static void print_spectrogram(void) {
+	#if (DEBUGP == 1)
+		//start_cycle_count();
+		DEBUG_PRINT("Acquisition complete, sending the following FVs\r\n");
+		for(unsigned int j=0; j < N_MELVECS; j++) {
+			DEBUG_PRINT("FV #%u:\t", j+1);
+			for(unsigned int i=0; i < SAMPLES_PER_MELVEC/2; i++) {
+
+				DEBUG_PRINT("%.2f, ", q15_to_float(spec_vec[j][i]));
+			}
+			DEBUG_PRINT("\r\n");
+
+		}
+		//stop_cycle_count("Print FV");
+	#endif
+}
+
 
 static void print_encoded_packet(uint8_t *packet) {
 #if (DEBUGP == 1)
@@ -61,11 +84,13 @@ static void print_encoded_packet(uint8_t *packet) {
 }
 
 static void encode_packet(uint8_t * packet, uint32_t * packet_cnt) {
-	// BE encoding of each mel coef
+	// BE encoding of each spectrogram coef
 	for (size_t i=0; i<N_MELVECS; i++) {
-		for (size_t j=0; j<MELVEC_LENGTH; j++) {
-			(packet+PACKET_HEADER_LENGTH)[(i*MELVEC_LENGTH+j)*2]   = mel_vectors[i][j] >> 8;
-			(packet+PACKET_HEADER_LENGTH)[(i*MELVEC_LENGTH+j)*2+1] = mel_vectors[i][j] & 0xFF;
+		for (size_t j=0; j<SAMPLES_PER_MELVEC/2; j++) {
+			(packet+PACKET_HEADER_LENGTH)[(i*SAMPLES_PER_MELVEC/2+j)*2]   = spec_vec[i][j] >> 8;
+			(packet+PACKET_HEADER_LENGTH)[(i*SAMPLES_PER_MELVEC/2+j)*2+1] = spec_vec[i][j] & 0xFF;
+			//(packet+PACKET_HEADER_LENGTH)[(i*MELVEC_LENGTH+j)*2]   = mel_vectors[i][j] >> 8;
+			//(packet+PACKET_HEADER_LENGTH)[(i*MELVEC_LENGTH+j)*2+1] = mel_vectors[i][j] & 0xFF;
 		}
 	}
 	// Write header and tag into the packet.
@@ -83,17 +108,17 @@ static void encode_packet(uint8_t * packet, uint32_t * packet_cnt) {
 static void send_spectrogram() {
 	uint8_t packet[PACKET_LENGTH];
 
-	start_cycle_count();
+	//start_cycle_count();
 	encode_packet(packet, &packet_cnt);
-	stop_cycle_count("Encode packet");
+	//stop_cycle_count("Encode packet");
 
-	start_cycle_count();
-	S2LP_WakeUp(); // wake up the antenna iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii voir s2lp.c fonction que les tuteurs ont fait for put
+	//start_cycle_count();
+	S2LP_WakeUp(); // wake up the radio  iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii voir s2lp.c fonction que les tuteurs ont fait for put
 	S2LP_Send(packet, PACKET_LENGTH);
-	S2LP_Sleep(); //sleep the antenna
+	S2LP_Sleep(); //sleep the radio
 
 	S2LP_Send(packet, PACKET_LENGTH);
-	stop_cycle_count("Send packet");
+	//stop_cycle_count("Send packet");
 
 	print_encoded_packet(packet);
 
@@ -101,29 +126,16 @@ static void send_spectrogram() {
 
 
 // -------------------------------------------THRESHOLD DYNAMIQUE -------------------------------------iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
-int c = 0;
-q15_t buf_var[10];
+int c = 0; // index of buffer that will be filled for computing the mean of variances
+q15_t buf_var[10]; // Buffer that will be filled for computing the mean of variances
 
 static void dynamic_treshold(q15_t variance) {
 	int index = c%10;
 	buf_var[index] = variance;
 	c+=1;
-
 }
-
-/* NOT USEFUL ANYMORE we use arm_mean instead
-q15_t mean_q15(q15_t* arr, int len) {
-	int32_t sum = 0;
-	for (int i = 0; i < len; i++) {
-		sum += arr[i];
-	}
-	return (q15_t)(sum / len);
-}
-*/
-
 
 static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pendant que l'autre est traité alors on remplit l'autre pour pas perdre de temps
-
 
 	if (rem_n_bufs != -1) {
 		rem_n_bufs--;
@@ -140,30 +152,38 @@ static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pe
 	q15_t var;
 
 	arm_var_q15(ADCData[buf_cplt], ADC_BUF_SIZE, &var); // 2* adc buf size ? et calculer sur tout le vecteur ?
-	//printf("var avant = %d\n\r", (int)var);
+	//printf("var avant = %d\n\r", var);
 
-	q15_t threshold_actuel = var;
+	q15_t threshold_actuel = var; //tresh_actuel se base sur variance calculée au moment présent
 	dynamic_treshold(var); //complete buf_var with value of var
 
 	q15_t mean_var;
 	if (c>9) {
 		arm_mean_q15(buf_var, 10, &mean_var);
-		//printf("mean_var = %d\n\r", pResult);
+		//printf("mean_var = %d\n\r", mean_var);
 
-		if (1.1*mean_var < threshold_actuel || (int)var > 0.5) { //si moyenne des 10 derniers variances est plus grand que threshold actuel //(int)var > 2
+		if ((1.1*mean_var < threshold_actuel & var > 1) || var>3) { //if mean of the 10 last variances is bigger than the actual threshold
 			printf("threshold_actuel = %d\n\r", (int) threshold_actuel);
 			//start_cycle_count();
 			Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
-			Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
+			Spectrogram_Compute((q15_t *)ADCData[buf_cplt],spec_vec[cur_spec_vec]);
 
-			cur_melvec++;
+			cur_spec_vec++;
 
 			//stop_cycle_count("spectrogram");
+			ADCData[buf_cplt] = 0; //icii iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
 			ADCDataRdy[buf_cplt] = 0;
 
 			if (rem_n_bufs == 0) {
+				//printf("Same loop of print_spectogram");
 				print_spectrogram();
+				printf("Same loop of print_spectogram\n\r");
+
+
+
 				send_spectrogram();
+				printf("send sepectrosksj\n\r");
+
 			}
 		}
 	ADCDataRdy[buf_cplt] = 0;
