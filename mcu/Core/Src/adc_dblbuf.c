@@ -12,9 +12,9 @@ static volatile uint16_t ADCDoubleBuf[2*ADC_BUF_SIZE]; /* ADC group regular conv
 static volatile uint16_t* ADCData[2] = {&ADCDoubleBuf[0], &ADCDoubleBuf[ADC_BUF_SIZE]};
 static volatile uint8_t ADCDataRdy[2] = {0, 0};
 
-static volatile uint8_t cur_spec_vec = 0;
+static volatile uint8_t cur_spec_vec = 0; //modify
 //static q15_t mel_vectors[N_MELVECS][MELVEC_LENGTH];
-static q15_t spec_vec[N_MELVECS][SAMPLES_PER_MELVEC/2];
+static q15_t spec_vec[N_MELVECS][SAMPLES_PER_MELVEC/2]; //modify
 
 static uint32_t packet_cnt = 0;
 
@@ -22,7 +22,7 @@ static volatile int32_t rem_n_bufs = 0;
 
 int StartADCAcq(int32_t n_bufs) {
 	rem_n_bufs = n_bufs;
-	cur_spec_vec = 0;
+	cur_spec_vec = 0; //modify
 	if (rem_n_bufs != 0) {
 		return HAL_ADC_Start_DMA(&hadc1, (uint32_t *)ADCDoubleBuf, 2*ADC_BUF_SIZE);
 	} else {
@@ -63,9 +63,9 @@ static void print_spectrogram(void) {
 		DEBUG_PRINT("Acquisition complete, sending the following FVs\r\n");
 		for(unsigned int j=0; j < N_MELVECS; j++) {
 			DEBUG_PRINT("FV #%u:\t", j+1);
-			for(unsigned int i=0; i < SAMPLES_PER_MELVEC/2; i++) {
+			for(unsigned int i=0; i < SAMPLES_PER_MELVEC/2; i++) { //modify
 
-				DEBUG_PRINT("%.2f, ", q15_to_float(spec_vec[j][i]));
+				DEBUG_PRINT("%.2f, ", q15_to_float(spec_vec[j][i])); //modify
 			}
 			DEBUG_PRINT("\r\n");
 
@@ -86,9 +86,9 @@ static void print_encoded_packet(uint8_t *packet) {
 static void encode_packet(uint8_t * packet, uint32_t * packet_cnt) {
 	// BE encoding of each spectrogram coef
 	for (size_t i=0; i<N_MELVECS; i++) {
-		for (size_t j=0; j<SAMPLES_PER_MELVEC/2; j++) {
-			(packet+PACKET_HEADER_LENGTH)[(i*SAMPLES_PER_MELVEC/2+j)*2]   = spec_vec[i][j] >> 8;
-			(packet+PACKET_HEADER_LENGTH)[(i*SAMPLES_PER_MELVEC/2+j)*2+1] = spec_vec[i][j] & 0xFF;
+		for (size_t j=0; j<SAMPLES_PER_MELVEC/2; j++) { //modify
+			(packet+PACKET_HEADER_LENGTH)[(i*SAMPLES_PER_MELVEC/2+j)*2]   = spec_vec[i][j] >> 8; //modify
+			(packet+PACKET_HEADER_LENGTH)[(i*SAMPLES_PER_MELVEC/2+j)*2+1] = spec_vec[i][j] & 0xFF; //modify
 			//(packet+PACKET_HEADER_LENGTH)[(i*MELVEC_LENGTH+j)*2]   = mel_vectors[i][j] >> 8;
 			//(packet+PACKET_HEADER_LENGTH)[(i*MELVEC_LENGTH+j)*2+1] = mel_vectors[i][j] & 0xFF;
 		}
@@ -113,7 +113,7 @@ static void send_spectrogram() {
 	//stop_cycle_count("Encode packet");
 
 	//start_cycle_count();
-	S2LP_WakeUp(); // wake up the radio  iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii voir s2lp.c fonction que les tuteurs ont fait for put
+	S2LP_WakeUp(); // wake up the radio voir s2lp.c fonction que les tuteurs ont fait for put
 	S2LP_Send(packet, PACKET_LENGTH);
 	S2LP_Sleep(); //sleep the radio
 
@@ -166,23 +166,21 @@ static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pe
 			printf("threshold_actuel = %d\n\r", (int) threshold_actuel);
 			//start_cycle_count();
 			Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
-			Spectrogram_Compute((q15_t *)ADCData[buf_cplt],spec_vec[cur_spec_vec]);
+			Spectrogram_Compute((q15_t *)ADCData[buf_cplt],spec_vec[cur_spec_vec]); //modify (before : Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);)
 
 			cur_spec_vec++;
 
 			//stop_cycle_count("spectrogram");
-			ADCData[buf_cplt] = 0; //icii iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+
+			ADCData[buf_cplt] = 0; //ici
 			ADCDataRdy[buf_cplt] = 0;
 
 			if (rem_n_bufs == 0) {
-				//printf("Same loop of print_spectogram");
 				print_spectrogram();
-				printf("Same loop of print_spectogram\n\r");
-
-
+				printf("spectogram has been printed \n\r");
 
 				send_spectrogram();
-				printf("send sepectrosksj\n\r");
+				printf("spectogram has been sendd\n\r");
 
 			}
 		}
