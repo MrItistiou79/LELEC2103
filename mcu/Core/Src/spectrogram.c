@@ -139,7 +139,7 @@ void Spectrogram_Format(q15_t *buf)
 }
 
 
-// Compute spectrogram of samples and transform into MEL vectors.
+// Compute spectrogram of samples.
 void Spectrogram_Compute(q15_t *samples, q15_t *spec_vec)
 {
 	// STEP 1  : Windowing of input samples
@@ -162,27 +162,56 @@ void Spectrogram_Compute(q15_t *samples, q15_t *spec_vec)
 	arm_rfft_q15(&rfft_inst, buf, buf_fft);
 
 
-	// computation of an estimation of the norm
-	q15_t alpha = 31476;
-	q15_t beta = 13036;
-	arm_cmplx_mag_q15(buf, buf, SAMPLES_PER_MELVEC/2);
 
-	//float a = 0.96043;
-	//float b = 0.39782;
-	//arm_float_to_q15(&a, &alpha, 1);
-	//printf("alpha = %d\n\r", alpha);
-	//printf("%d : alpha = ", int(alpha));
-	//arm_float_to_q15(&b, &beta, 1);
-	//printf("beta = %d\n\r", beta);
 
-	for (uint16_t i = 0; i < (uint16_t) (SAMPLES_PER_MELVEC/2); i++){
-		buf[i] = (q15_t) (alpha * (ABS(MAX(buf_fft[2*i], buf_fft[2*i+1]))) + beta * (ABS(MIN(buf_fft[2*i], buf_fft[2*i + 1]))));
+	// STEP 3  : Compute the complex magnitude of the FFT
+	//           Because the FFT can output a great proportion of very small values,
+	//           we should rescale all values by their maximum to avoid loss of precision when computing the complex magnitude
+	//           In this implementation, we use integer division and multiplication to rescale values, which are very costly.
+
+	// STEP 3.1: Find the extremum value (maximum of absolute values)
+	//           Complexity: O(N)
+	//           Number of cycles: <TODO>
+
+	q31_t vmax=0, tmp;
+	uint32_t pIndex=0;
+	for (int i=0; i< (uint16_t) (SAMPLES_PER_MELVEC/2); i++) {
+		tmp = ((q31_t)buf_fft[2*i]*(q31_t)buf_fft[2*i]+(q31_t)buf_fft[2*i+1]*(q31_t)buf_fft[2*i+1]);
+		if (tmp>vmax){
+			vmax = tmp;
+			pIndex = i;
+		}
+	}
+	vmax = sqrt(vmax);
+
+	// STEP 3.2: Normalize the vector - Dynamic range increase
+	//           Complexity: O(N)
+	//           Number of cycles: <TODO>
+
+	for (int i=0; i < SAMPLES_PER_MELVEC; i++) // We don't use the second half of the symmetric spectrum
+	{
+		buf[i] = (q15_t) (((q31_t) buf_fft[i] << 15) /((q31_t)vmax));
 	}
 
-	// STEP 4:   Apply MEL transform
-	//           --> Fast Matrix Multiplication
-	//           Complexity: O(Nmel*N)
+	// STEP 3.3: Compute the complex magnitude
+	//           --> The output buffer is now two times smaller because (real|imag) --> (mag)
+	//           Complexity: O(N)
 	//           Number of cycles: <TODO>
+
+	arm_cmplx_mag_q15(buf, buf, SAMPLES_PER_MELVEC/2);
+
+	// STEP 3.4: Denormalize the vector
+	//           Complexity: O(N)
+	//           Number of cycles: <TODO>
+
+	for (int i=0; i < SAMPLES_PER_MELVEC/2; i++)
+	{
+		buf[i] = (q15_t) ((((q31_t) buf[i]) * ((q31_t) vmax) ) >> 15 );
+	}
+
+
+
+	// STEP 4:
 
 	// /!\ The difference between the function arm_mat_mult_q15() and the fast variant is that the fast variant use a 32-bit rather than a 64-bit accumulator.
 	// The result of each 1.15 x 1.15 multiplication is truncated to 2.30 format. These intermediate results are accumulated in a 32-bit register in 2.30 format.
@@ -193,13 +222,18 @@ void Spectrogram_Compute(q15_t *samples, q15_t *spec_vec)
 	// as a total of numColsA additions are computed internally for each output element. Because our hz2mel_mat matrix contains lots of zeros in its rows, this is not necessary.
 
 
-	arm_matrix_instance_q15 hz2mel_inst, fftmag_inst, melvec_inst;
+	arm_matrix_instance_q15 fftmag_inst; //modify
 
-	arm_mat_init_q15(&hz2mel_inst, MELVEC_LENGTH, SAMPLES_PER_MELVEC/2, hz2mel_mat);
-	arm_mat_init_q15(&fftmag_inst, SAMPLES_PER_MELVEC/2, 1, spec_vec);
 
+	arm_mat_init_q15(&fftmag_inst, SAMPLES_PER_MELVEC/2, 1, spec_vec); //modify
+	// /!\ In order to avoid overflows completely the input signals should be scaled down. Scale down one of the input matrices by log2(numColsA) bits to avoid overflows,
+		// as a total of numColsA additions are computed internally for each output element. Because our hz2mel_mat matrix contains lots of zeros in its rows, this is not necessary.
+
+
+
+
+	//arm_mat_init_q15(&hz2mel_inst, MELVEC_LENGTH, SAMPLES_PER_MELVEC/2, hz2mel_mat);
 	//arm_mat_init_q15(&melvec_inst, MELVEC_LENGTH, 1, melvec);
-
 	//arm_mat_mult_fast_q15(&hz2mel_inst, &fftmag_inst, &melvec_inst, buf_tmp); Hz => MEL
 
 
