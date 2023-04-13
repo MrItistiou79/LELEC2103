@@ -206,7 +206,7 @@ void Spectrogram_Compute(q15_t *samples, q15_t *spec_vec)
 
 	for (int i=0; i < SAMPLES_PER_MELVEC/2; i++)
 	{
-		buf[i] = (q15_t) ((((q31_t) buf[i]) * ((q31_t) vmax) ) >> 15 );
+		spec_vec[i] = (q15_t) ((((q31_t) buf[i]) * ((q31_t) vmax) ) >> 15 );
 	}
 
 
@@ -228,6 +228,10 @@ void Spectrogram_Compute(q15_t *samples, q15_t *spec_vec)
 	arm_mat_init_q15(&fftmag_inst, SAMPLES_PER_MELVEC/2, 1, spec_vec); //modify
 	// /!\ In order to avoid overflows completely the input signals should be scaled down. Scale down one of the input matrices by log2(numColsA) bits to avoid overflows,
 		// as a total of numColsA additions are computed internally for each output element. Because our hz2mel_mat matrix contains lots of zeros in its rows, this is not necessary.
+
+	for(unsigned int j=0; j < SAMPLES_PER_MELVEC/2; j++) {
+			DEBUG_PRINT("%.2f, ", q15_to_float(fftmag_inst.pData[j]));
+	}
 
 
 
