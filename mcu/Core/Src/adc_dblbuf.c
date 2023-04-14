@@ -37,6 +37,7 @@ static void StopADCAcq() {
 	HAL_ADC_Stop_DMA(&hadc1);
 }
 
+/*
 static void print_spectrogram(void) {
 #if (DEBUGP == 1)
 	start_cycle_count();
@@ -51,6 +52,7 @@ static void print_spectrogram(void) {
 	stop_cycle_count("Print FV");
 #endif
 }
+*/
 
 static void print_encoded_packet(uint8_t *packet) {
 #if (DEBUGP == 1)
@@ -83,24 +85,26 @@ static void encode_packet(uint8_t * packet, uint32_t * packet_cnt) {
 static void send_spectrogram() {
 	uint8_t packet[PACKET_LENGTH];
 
-	start_cycle_count();
+	//start_cycle_count();
 	encode_packet(packet, &packet_cnt);
-	stop_cycle_count("Encode packet");
+	printf("Encode packet");
+	//stop_cycle_count("Encode packet");
 
-	start_cycle_count();
-	S2LP_WakeUp(); // wake up the antenna iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii voir s2lp.c fonction que les tuteurs ont fait for put
+	//start_cycle_count();
+	S2LP_WakeUp(); // wake up the antenna
 	S2LP_Send(packet, PACKET_LENGTH);
 	S2LP_Sleep(); //sleep the antenna
 
 	S2LP_Send(packet, PACKET_LENGTH);
-	stop_cycle_count("Send packet");
+	printf("Send packet");
+	//stop_cycle_count("Send packet");
 
 	print_encoded_packet(packet);
 
 }
 
 
-// -------------------------------------------THRESHOLD DYNAMIQUE -------------------------------------iciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii
+// ---THRESHOLD DYNAMIQUE ---
 int c = 0;
 q15_t buf_var[10];
 
@@ -110,17 +114,6 @@ static void dynamic_treshold(q15_t variance) {
 	c+=1;
 
 }
-
-/* NOT USEFUL ANYMORE we use arm_mean instead
-q15_t mean_q15(q15_t* arr, int len) {
-	int32_t sum = 0;
-	for (int i = 0; i < len; i++) {
-		sum += arr[i];
-	}
-	return (q15_t)(sum / len);
-}
-*/
-
 
 static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pendant que l'autre est traité alors on remplit l'autre pour pas perdre de temps
 
@@ -139,30 +132,24 @@ static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pe
 	ADCDataRdy[buf_cplt] = 1;
 	q15_t var;
 
-	arm_var_q15(ADCData[buf_cplt], ADC_BUF_SIZE, &var); // 2* adc buf size ? et calculer sur tout le vecteur ?
-	//printf("var avant = %d\n\r", (int)var);
+	arm_var_q15(ADCData[buf_cplt], ADC_BUF_SIZE, &var); // 2* adc buf size ? et calculer sur tout le vecteur ? //printf("var avant = %d\n\r", (int)var);
 
 	q15_t threshold_actuel = var;
-	dynamic_treshold(var); //complete buf_var with value of var
+	dynamic_treshold(var);
 
 	q15_t mean_var;
 	if (c>9) {
-		arm_mean_q15(buf_var, 10, &mean_var);
-		//printf("mean_var = %d\n\r", pResult);
+		arm_mean_q15(buf_var, 10, &mean_var); //printf("mean_var = %d\n\r", pResult);
 
-		if (1.1*mean_var < threshold_actuel || (int)var > 0.5) { //si moyenne des 10 derniers variances est plus grand que threshold actuel //(int)var > 2
-			printf("threshold_actuel = %d\n\r", (int) threshold_actuel);
-			//start_cycle_count();
+		if (1.1*mean_var < threshold_actuel || (int)var > 0.5) { //si moyenne des 10 derniers variances est plus grand que threshold actuel //(int)var > 2 //printf("threshold_actuel = %d\n\r", (int) threshold_actuel);
 			Spectrogram_Format((q15_t *)ADCData[buf_cplt]);
 			Spectrogram_Compute((q15_t *)ADCData[buf_cplt], mel_vectors[cur_melvec]);
-
 			cur_melvec++;
 
-			//stop_cycle_count("spectrogram");
 			ADCDataRdy[buf_cplt] = 0;
 
 			if (rem_n_bufs == 0) {
-				print_spectrogram();
+				//print_spectrogram();
 				send_spectrogram();
 			}
 		}
@@ -171,28 +158,18 @@ static void ADC_Callback(int buf_cplt) { //on remplit la moitié du buffer et pe
 	} else {
 		ADCDataRdy[buf_cplt] = 0;
 	}
-	//var = 0; // à checker pr être sûr qu'il faut faire ça
 
 }
 
 
-//extern uint8_t have_to_record; // variable qui va dire de record quand est mise à 1 et prend information
-
 void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-	//sinon ici en fonction du buffer qui est rempli ADCDoubleBuf[2*ADC_BUF_SIZE]
-	//if (ADCDoubleBuf[2*ADC_BUF_SIZE] ){
-
-	//if(have_to_record){
 	ADC_Callback(1);
-		//printf("1");}
 }
 
 void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
 {
-	//if(have_to_record)
 	ADC_Callback(0);
-		//printf("0);}
 }
 
 //TOKEN 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
